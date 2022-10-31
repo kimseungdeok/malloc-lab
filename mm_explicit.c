@@ -14,6 +14,9 @@
 #include <assert.h>
 #include <unistd.h>
 #include <string.h>
+// explicit
+#include <sys/mman.h>
+#include <errno.h>
 
 #include "mm.h"
 #include "memlib.h"
@@ -75,8 +78,8 @@ team_t team = {
 #define SUCC_FREEP(bp) (*(void**)(bp+WSIZE))
 
 // Declaration
-static void *heap_listp;
-static void *free_listp;
+static void *heap_listp; // heap 시작 주소 pointer
+static void *free_listp; // free list head - 가용 리스트 시작 부분
 static void *extend_heap(size_t words);
 static void *coalesce(void *bp);
 static void *find_fit(size_t a_size);
@@ -90,22 +93,22 @@ void putFreeBlock(void *bp);
  */
 int mm_init(void)
 {
-    heap_listp = mem_sbrk(24);
+    heap_listp = mem_sbrk(24); // 24byte를 늘려주고, 함수의 시작 부분을 가리키는 주소를 반환, mem_brk는 끝에 가있음
     /* Create the initial empty heap */
     if(heap_listp == (void *)-1)
         return -1;
 
-    PUT(heap_listp, 0);                          /* Alignment padding */
-    PUT(heap_listp+WSIZE, PACK(16,1));
-    PUT(heap_listp + 2*WSIZE, NULL);
-    PUT(heap_listp + 3*WSIZE, NULL);
-    PUT(heap_listp + 4*WSIZE, PACK(16, 1));
-    PUT(heap_listp + 5*WSIZE, PACK(0,1));
+    PUT(heap_listp, 0); // 사용하지 않는 padding                   
+    PUT(heap_listp+WSIZE, PACK(16,1)); // 프롤로그 헤더
+    PUT(heap_listp + 2*WSIZE, NULL);  // 프롤로그 pred 포인터를 null로 초기화
+    PUT(heap_listp + 3*WSIZE, NULL); // 프롤로그 succ 포인터를 null로 초기화
+    PUT(heap_listp + 4*WSIZE, PACK(16, 1)); // 프롤로그 풋터
+    PUT(heap_listp + 5*WSIZE, PACK(0,1)); // 에필로그 헤더
 
-    free_listp = heap_listp + DSIZE;
+    free_listp = heap_listp + DSIZE; // free_listp를 pred 포인터를 가리키게 초기화
 
-    if(extend_heap(CHUNKSIZE/WSIZE) == NULL)
-        return -1;
+    if(extend_heap(CHUNKSIZE/WSIZE) == NULL) 
+        return -1; 
     return 0;
 }
 
@@ -148,28 +151,36 @@ static void *coalesce(void *bp)
     return bp;
 
 }
-
+// extend heap 함수
+// 1. heap이 초기화될때 다음 블록을 CHUNKSIZE만큼 미리 할당해준다.
+// 2. mm_malloc이 적당한 맞춤을 찾지 못했을때 CHUNKSIZE만큼 할당해준다.
+// 
+// heap을 CHUNKSIZE byte로 확장하고 초기 가용 블록을 생성한다.
+// 여기까지 진행되면 할당기는 초기화를 완료하고, application으로부터 할당과 반환 요청을 받을 준비를 완료하였다.
 static void *extend_heap(size_t words)
 {
     char *bp;
     size_t size;
 
-    
+    // 블록을 짝수개만큼 할당 (한번에 2워드씩 할당하므로)
     size = (words % 2) ? (words+1) * WSIZE : words * WSIZE;
     if (((bp = mem_sbrk(size)) == (void*)-1))
     {
         return NULL;
     }
+    // 할당한 블록에 header, footer를 설정해주고 에필로그를 설정해줌
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
     PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));
     
+
     return coalesce(bp);
 }
 
 static void *find_fit(size_t asize) // first fit으로 검색을 함
 {
     void *bp;
+    // 가용 리스트 내부의 유일한 할당 블록인 프롤로그 블록을 만나면 종료
     for(bp = free_listp; GET_ALLOC(HDRP(bp)) != 1; bp = SUCC_FREEP(bp))
     {
         if(GET_SIZE(HDRP(bp)) >= asize)
@@ -187,7 +198,7 @@ static void *find_fit(size_t asize) // first fit으로 검색을 함
 static void place(void *bp, size_t asize)
 {
     size_t csize = GET_SIZE(HDRP(bp));
-
+    // 할당 블록은 freelist에서 지운다.
     removeBlock(bp);
     if((csize - asize) >= (2*DSIZE)){
         PUT(HDRP(bp), PACK(asize, 1));
@@ -238,7 +249,8 @@ void *mm_malloc(size_t size)
     return bp;
 
 }
-
+// putFreeBlock 함수 
+// 새로운 블록을 넣고 그에따른 pred포인터와 succ의 포인터를 변경해주는 함수
 void putFreeBlock(void *bp)
 {
     SUCC_FREEP(bp) = free_listp;
@@ -246,7 +258,8 @@ void putFreeBlock(void *bp)
     PRED_FREEP(free_listp) = bp;
     free_listp = bp;
 }
-
+// removeBlock 함수
+// splice out 해주는 함수
 void removeBlock(void *bp)
 {
     if(bp == free_listp)
@@ -297,19 +310,5 @@ void *mm_realloc(void *bp, size_t size)
     memcpy(newp, bp, oldsize);
     mm_free(bp);
     return newp;
-
-    // void *oldptr = ptr;
-    // void *newptr;
-    // size_t copySize;
-    // newptr = mm_malloc(size);
-    // if (newptr == NULL)
-    //   return NULL;
-    // // copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    // copySize = GET_SIZE(HDRP(oldptr));
-    // if (size < copySize)
-    //   copySize = size;
-    // memcpy(newptr, oldptr, copySize);
-    // mm_free(oldptr);
-    // return newptr;
 }
 
