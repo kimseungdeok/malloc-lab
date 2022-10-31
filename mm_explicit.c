@@ -15,8 +15,8 @@
 #include <unistd.h>
 #include <string.h>
 // explicit
-#include <sys/mman.h>
-#include <errno.h>
+#include <sys/mman.h> // 메모리 관리 관련 헤더
+#include <errno.h> // 정적 메모리 위치에 저장된 오류 코드를 통해 오류 상태를 보고 및 검색하기 위한 매크로를 정의
 
 #include "mm.h"
 #include "memlib.h"
