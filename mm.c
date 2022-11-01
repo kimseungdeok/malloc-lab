@@ -14,6 +14,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "mm.h"
 #include "memlib.h"
@@ -65,11 +66,11 @@ team_t team = {
 
 // Declaration
 static void *heap_listp;
-static char *last_bp; // next_fit
 static void *extend_heap(size_t words);
 static void *coalesce(void *bp);
-static void *next_fit(size_t a_size);
+static void *best_fit(size_t asize); // best fit
 static void place(void *bp, size_t a_size);
+
 
 /* 
  * mm_init - initialize the malloc package.
@@ -84,11 +85,12 @@ int mm_init(void)
     PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1)); /* Prologue footer */
     PUT(heap_listp + (3*WSIZE), PACK(0, 1));     /* Epilogue header */
     heap_listp += (2*WSIZE);
+    
 
     /* Extend the empty heap with a free block of CHUNKSIZE bytes */
     if (extend_heap(CHUNKSIZE/WSIZE) == NULL)
         return -1;
-    last_bp = (char *)heap_listp; // heap_listp는 void였어서 last_bp에 맞게 char형으로 변환
+    
     return 0;
 }
 
@@ -108,9 +110,9 @@ void *mm_malloc(size_t size)
     else    
         asize = DSIZE *((size + (DSIZE) + (DSIZE-1)) / DSIZE);
 
-    if ((bp = next_fit(asize)) != NULL) {
+    if ((bp = best_fit(asize)) != NULL) {
         place(bp, asize);
-        last_bp = bp;
+        
         return bp;
     }
 
@@ -119,35 +121,66 @@ void *mm_malloc(size_t size)
     if((bp = extend_heap(extendsize/WSIZE)) == NULL)
         return NULL;
     place(bp, asize);
-    last_bp = bp;
+    
     return bp;
 
 }
 
-static void *next_fit(size_t asize)
+// static void *next_fit(size_t asize)
+// {
+//     char *bp = last_bp;
+
+//     for (bp = NEXT_BLKP(bp); GET_SIZE(HDRP(bp)) != 0; bp = NEXT_BLKP(bp))
+//     {
+//         if(!GET_ALLOC(HDRP(bp)) && GET_SIZE(HDRP(bp)) >= asize)
+//         {
+//             last_bp = bp;
+//             return bp;
+//         }
+//     }
+
+//     bp = heap_listp;
+//     while(bp < last_bp)
+//     {
+//         bp = NEXT_BLKP(bp);
+//         if(!GET_ALLOC(HDRP(bp)) && GET_SIZE(HDRP(bp)) >= asize)
+//         {
+//             last_bp = bp;
+//             return bp;
+//         }
+//     }
+//     return NULL;
+// }
+
+static void *best_fit(size_t asize)
 {
-    char *bp = last_bp;
+       char *bp;
+    char *best_bp = NULL;
+    size_t best_size;
+    size_t min = SIZE_MAX;
 
-    for (bp = NEXT_BLKP(bp); GET_SIZE(HDRP(bp)) != 0; bp = NEXT_BLKP(bp))
-    {
-        if(!GET_ALLOC(HDRP(bp)) && GET_SIZE(HDRP(bp)) >= asize)
-        {
-            last_bp = bp;
-            return bp;
+    for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)){ // GET_SIZE(HDRP(bp)) > 0 ; 에필로그 가기 전까지
+
+
+        if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
+            best_size = asize - GET_SIZE(HDRP(bp));
+
+            if (best_size == 0){
+                return bp;
+            }    
+
+            if (best_size < min) {
+                min = best_size;
+                best_bp = bp;
+            } 
         }
     }
 
-    bp = heap_listp;
-    while(bp < last_bp)
-    {
-        bp = NEXT_BLKP(bp);
-        if(!GET_ALLOC(HDRP(bp)) && GET_SIZE(HDRP(bp)) >= asize)
-        {
-            last_bp = bp;
-            return bp;
-        }
+    if (best_bp == NULL) {
+        return NULL;
     }
-    return NULL;
+
+    return best_bp;
 }
 
 /*
@@ -188,7 +221,7 @@ static void *coalesce(void *bp)
 
     if(prev_alloc && next_alloc) /* Case 1 */
     {  
-        last_bp = bp;
+        
         return bp;
     }
 
@@ -214,7 +247,7 @@ static void *coalesce(void *bp)
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
     }
-    last_bp = bp;
+    
     return bp;
 
 
