@@ -78,7 +78,7 @@ static void *find_fit(size_t a_size);
 static void place(void *bp, size_t a_size);
 
 /* 
- * mm_init - initialize the malloc package.
+ * mm_init : 4 words 사이즈의 free 리스트를 초기화하고, 초기 free 블록 생성
  */
 int mm_init(void)
 {
@@ -96,7 +96,9 @@ int mm_init(void)
         return -1;
     return 0;
 }
-
+/*
+ * extend_heap(words) : 워드 단위 메모리를 인자로 받아, 새 가용 블록으로 힙을 확장한다.
+ */
 static void *extend_heap(size_t words)
 {
     char *bp;
@@ -114,25 +116,28 @@ static void *extend_heap(size_t words)
     return coalesce(bp);
 }
 
+/*
+ * coalesce(bp) : 현재 가용 블록을 앞뒤 가용 블록과 연결
+ */
 static void *coalesce(void *bp)
 {
     size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
     size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
     size_t size = GET_SIZE(HDRP(bp));
 
-    if(prev_alloc && next_alloc) /* Case 1 */
+    if(prev_alloc && next_alloc) /* Case 1 : 양쪽이 할당된경우 */
     {  
         return bp;
     }
 
-    else if(prev_alloc && !next_alloc) /* Case 2 */
+    else if(prev_alloc && !next_alloc) /* Case 2 : 이전 블록은 할당상태, 다음 블록은 가용 상태인 경우 */
     { 
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
         PUT(HDRP(bp), PACK(size, 0));
         PUT(FTRP(bp), PACK(size, 0));
     }
 
-    else if (!prev_alloc && next_alloc) /* Case 3 */
+    else if (!prev_alloc && next_alloc) /* Case 3 : 이전 블록은 가용상태, 다음 블록은 할당 상태인 경우 */
     { 
         size += GET_SIZE(HDRP(PREV_BLKP(bp)));
         PUT(FTRP(bp), PACK(size, 0));
@@ -140,7 +145,7 @@ static void *coalesce(void *bp)
         bp = PREV_BLKP(bp);
     }
 
-    else                               /* Case 4 */
+    else /* Case 4 : 이전 블록과 다음 블록 모두 가용상태인 경우 */
     {
         size += GET_SIZE(HDRP(PREV_BLKP(bp))) + GET_SIZE(FTRP(NEXT_BLKP(bp)));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
@@ -153,8 +158,9 @@ static void *coalesce(void *bp)
 }
 
 /* 
- * mm_malloc - Allocate a block by incrementing the brk pointer.
- *     Always allocate a block whose size is a multiple of the alignment.
+ * mm_malloc(size) - 요청 받은 메모리 사이즈를 인접한 8의 배수로 올려 할당한다.
+                     만약 맞는 크기의 가용 블록이 없다면 추가 힙 메모리를 활장 & 할당한다.
+ *     
  */
 void *mm_malloc(size_t size)
 {
@@ -198,8 +204,8 @@ static void *find_fit(size_t asize) // first fit으로 검색을 함
 }
 
 /*
-    데이터를 할당할 가용 블록의 bp와 배치 용량 할당
-*/
+ * place(bp, size) : size만큼 할당 후 남는 부분이 분할되었다면 free 블록 처리를 해준다.
+ */
 static void place(void *bp, size_t asize)
 {
     size_t csize = GET_SIZE(HDRP(bp));
@@ -218,11 +224,8 @@ static void place(void *bp, size_t asize)
     
 }
 
-
-
-
 /*
- * mm_free - Freeing a block does nothing.
+ * mm_free(bp) - size와 할당 정보를 초기화한다.
  */
 void mm_free(void *bp)
 {
@@ -235,12 +238,10 @@ void mm_free(void *bp)
 
 
 /*
- * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
+ * mm_realloc(ptr, size) - 요청한 사이즈만큼 재할당한다.
  */
 void *mm_realloc(void *ptr, size_t size)
 {
-
-
     void *oldptr = ptr;
     void *newptr;
     size_t copySize;

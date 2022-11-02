@@ -24,7 +24,7 @@
  ********************************************************/
 team_t team = {
     /* Team name */
-    "team4",
+    "swjungle5-team4",
     /* First member's full name */
     "kimseungdeok",
     /* First member's email address */
@@ -91,7 +91,9 @@ int mm_init(void)
     last_bp = (char *)heap_listp; // heap_listp는 void였어서 last_bp에 맞게 char형으로 변환
     return 0;
 }
-
+/*
+ * 
+ */
 void *mm_malloc(size_t size)
 {
     size_t asize;

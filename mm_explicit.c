@@ -27,7 +27,7 @@
  ********************************************************/
 team_t team = {
     /* Team name */
-    "team4",
+    "swjungle5-w06-team4",
     /* First member's full name */
     "kimseungdeok",
     /* First member's email address */
@@ -84,7 +84,8 @@ static void *extend_heap(size_t words);
 static void *coalesce(void *bp);
 static void *find_fit(size_t a_size);
 static void place(void *bp, size_t a_size);
-/* explici 구현을 위해 추가한 부분 */
+
+/* explicit */
 void removeBlock(void *bp);
 void putFreeBlock(void *bp);
 
@@ -94,7 +95,6 @@ void putFreeBlock(void *bp);
 int mm_init(void)
 {
     heap_listp = mem_sbrk(24); // 24byte를 늘려주고, 함수의 시작 부분을 가리키는 주소를 반환, mem_brk는 끝에 가있음
-    /* Create the initial empty heap */
     if(heap_listp == (void *)-1)
         return -1;
 
@@ -112,6 +112,9 @@ int mm_init(void)
     return 0;
 }
 
+/*
+ *  
+ */
 static void *coalesce(void *bp)
 {
     size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
@@ -193,8 +196,8 @@ static void *find_fit(size_t asize) // first fit으로 검색을 함
 }
 
 /*
-    데이터를 할당할 가용 블록의 bp와 배치 용량 할당
-*/
+ * place(bp, size) : size만큼 할당 후 남는 부분이 분할되었다면 free 블록 처리를 해준다.
+ */
 static void place(void *bp, size_t asize)
 {
     size_t csize = GET_SIZE(HDRP(bp));
@@ -217,8 +220,9 @@ static void place(void *bp, size_t asize)
 }
 
 /* 
- * mm_malloc - Allocate a block by incrementing the brk pointer.
- *     Always allocate a block whose size is a multiple of the alignment.
+ * mm_malloc(size) - 요청 받은 메모리 사이즈를 인접한 8의 배수로 올려 할당한다.
+                     만약 맞는 크기의 가용 블록이 없다면 추가 힙 메모리를 활장 & 할당한다.
+ *     
  */
 void *mm_malloc(size_t size)
 {
@@ -226,11 +230,9 @@ void *mm_malloc(size_t size)
     size_t extendsize;
     char *bp;
 
-    /* Ignore spurious request */
     if (size <= 0)
         return NULL;
 
-    /* Adjust block size to include overhead and alignment reqs */
     if (size <= DSIZE)
         asize = 2*DSIZE;
     else    
@@ -241,7 +243,6 @@ void *mm_malloc(size_t size)
         return bp;
     }
 
-    /* No fit found. Get more memory and place the block */
     extendsize = MAX(asize, CHUNKSIZE);
     if((bp = extend_heap(extendsize/WSIZE)) == NULL)
         return NULL;
@@ -249,8 +250,9 @@ void *mm_malloc(size_t size)
     return bp;
 
 }
-// putFreeBlock 함수 
-// 새로운 블록을 넣고 그에따른 pred포인터와 succ의 포인터를 변경해주는 함수
+/*
+* putFreeBlock(bp) - 새로운 블록을 넣고 그에따른 pred포인터와 succ의 포인터를 변경해준다.
+*/ 
 void putFreeBlock(void *bp)
 {
     SUCC_FREEP(bp) = free_listp;
@@ -258,8 +260,10 @@ void putFreeBlock(void *bp)
     PRED_FREEP(free_listp) = bp;
     free_listp = bp;
 }
-// removeBlock 함수
-// splice out 해주는 함수
+
+/*
+* removeBlock(bp) - splice out 해준다. 즉 기존의 연결을 끊고 새로 free한 블록과의 연결관계를 형성
+*/
 void removeBlock(void *bp)
 {
     if(bp == free_listp)
@@ -275,7 +279,7 @@ void removeBlock(void *bp)
 
 
 /*
- * mm_free - Freeing a block does nothing.
+ * mm_free(bp) - size와 할당 정보를 초기화한다.
  */
 void mm_free(void *bp)
 {
@@ -288,7 +292,7 @@ void mm_free(void *bp)
 
 
 /*
- * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
+ * mm_realloc(ptr, size) - 요청한 사이즈만큼 재할당한다.
  */
 void *mm_realloc(void *bp, size_t size)
 {
