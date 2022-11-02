@@ -183,15 +183,6 @@ void *mm_malloc(size_t size)
         return NULL;
     place(bp, asize);
     return bp;
-
-    // int newsize = ALIGN(size + SIZE_T_SIZE);
-    // void *p = mem_sbrk(newsize);
-    // if (p == (void *)-1)
-	// return NULL;
-    // else {
-    //     *(size_t *)p = size;
-    //     return (void *)((char *)p + SIZE_T_SIZE);
-    // }
 }
 
 static void *find_fit(size_t asize) // first fit으로 검색을 함
@@ -248,24 +239,7 @@ void mm_free(void *bp)
  */
 void *mm_realloc(void *ptr, size_t size)
 {
-    // if(size <= 0){
-    //     mm_free(bp);
-    //     return 0;
-    // }
-    // if(bp == NULL){
-    //     return mm_malloc(size);
-    // }
-    // void *newp = mm_malloc(size);
-    // if(newp == NULL){
-    //     return 0;
-    // }
-    // size_t oldsize = GET_SIZE(HDRP(bp));
-    // if(size < oldsize){
-    //     oldsize = size;
-    // }
-    // memcpy(newp, bp, oldsize);
-    // mm_free(bp);
-    // return newp;
+
 
     void *oldptr = ptr;
     void *newptr;
@@ -273,7 +247,6 @@ void *mm_realloc(void *ptr, size_t size)
     newptr = mm_malloc(size);
     if (newptr == NULL)
       return NULL;
-    // copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
     copySize = GET_SIZE(HDRP(oldptr));
     if (size < copySize)
       copySize = size;
